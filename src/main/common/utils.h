@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
@@ -54,9 +57,8 @@
 #if !defined(UNUSED)
 #define UNUSED(x) (void)(x)
 #endif
-#define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
-#define STATIC_ASSERT(condition, name) \
-    typedef char assert_failed_ ## name [(condition) ? 1 : -1 ] __attribute__((unused))
+
+#define STATIC_ASSERT(condition, name) _Static_assert((condition), #name)
 
 
 #define BIT(x) (1 << (x))
@@ -80,6 +82,7 @@ http://resnet.uoregon.edu/~gurney_j/jmpc/bitwise.html
     (32*((v)/2L>>31 > 0) \
      + LOG2_32BIT((v)*1L >>16*((v)/2L>>31 > 0) \
                          >>16*((v)/2L>>31 > 0)))
+#define LOG2(v) LOG2_64BIT(v)
 
 #if 0
 // ISO C version, but no type checking

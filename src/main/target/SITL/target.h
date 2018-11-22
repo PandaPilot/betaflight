@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 // SITL (software in the loop) simulator
@@ -26,12 +29,11 @@
 
 #define TARGET_BOARD_IDENTIFIER "SITL"
 
-#define SIMULATOR_BUILD
 #define SIMULATOR_MULTITHREAD
 
 // use simulatior's attitude directly
 // disable this if wants to test AHRS algorithm
-#define SKIP_IMU_CALC
+#undef USE_IMU_CALC
 
 //#define SIMULATOR_ACC_SYNC
 //#define SIMULATOR_GYRO_SYNC
@@ -93,6 +95,7 @@
 #undef USE_TELEMETRY_LTM
 #undef USE_ADC
 #undef USE_VCP
+#undef USE_OSD
 #undef USE_PPM
 #undef USE_PWM
 #undef USE_SERIAL_RX
@@ -120,6 +123,8 @@
 #undef USE_VTX_SMARTAUDIO
 #undef USE_VTX_TRAMP
 #undef USE_CAMERA_CONTROL
+#undef USE_BRUSHED_ESC_AUTODETECT
+#undef USE_GPS_RESCUE
 
 #undef USE_I2C
 #undef USE_SPI
@@ -133,13 +138,9 @@
 
 #define DEFIO_NO_PORTS   // suppress 'no pins defined' warning
 
-#define WS2811_DMA_TC_FLAG (void *)1
-#define WS2811_DMA_HANDLER_IDENTIFER 0
-
-
 // belows are internal stuff
 
-uint32_t SystemCoreClock;
+extern uint32_t SystemCoreClock;
 
 #ifdef EEPROM_IN_RAM
 extern uint8_t eepromData[EEPROM_SIZE];

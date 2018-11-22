@@ -24,7 +24,10 @@ OPTIONS   ?=
 # compile for OpenPilot BootLoader support
 OPBL      ?= no
 
-# Debugger optons, must be empty or GDB
+# Debugger optons:
+#   empty           - ordinary build with all optimizations enabled
+#   RELWITHDEBINFO  - ordinary build with debug symbols and all optimizations enabled
+#   GDB             - debug build with minimum number of optimizations
 DEBUG     ?=
 
 # Insert the debugging hardfault debugger
@@ -117,6 +120,9 @@ OPTIMISE_DEFAULT      := -Og
 LTO_FLAGS             := $(OPTIMISE_DEFAULT)
 DEBUG_FLAGS            = -ggdb3 -DDEBUG
 else
+ifeq ($(DEBUG),INFO)
+DEBUG_FLAGS            = -ggdb3
+endif
 OPTIMISATION_BASE     := -flto -fuse-linker-plugin -ffast-math
 OPTIMISE_DEFAULT      := -O2
 OPTIMISE_SPEED        := -Ofast
@@ -200,12 +206,14 @@ CFLAGS     += $(ARCH_FLAGS) \
               $(addprefix -D,$(OPTIONS)) \
               $(addprefix -I,$(INCLUDE_DIRS)) \
               $(DEBUG_FLAGS) \
-              -std=gnu99 \
+              -std=gnu11 \
               -Wall -Wextra -Wunsafe-loop-optimizations -Wdouble-promotion \
               -ffunction-sections \
               -fdata-sections \
+              -fno-common \
               -pedantic \
               $(DEVICE_FLAGS) \
+              -D_GNU_SOURCE \
               -DUSE_STDPERIPH_DRIVER \
               -D$(TARGET) \
               $(TARGET_FLAGS) \
@@ -235,6 +243,7 @@ LD_FLAGS     = -lm \
               -Wl,-L$(LINKER_DIR) \
               -Wl,--cref \
               -Wl,--no-wchar-size-warning \
+              -Wl,--print-memory-usage \
               -T$(LD_SCRIPT)
 endif
 
@@ -320,7 +329,7 @@ $(OBJECT_DIR)/$(TARGET)/%.o: %.S
 ## all               : Build all targets (excluding unsupported)
 all: $(SUPPORTED_TARGETS)
 
-## all_with_unsupported : Build all targets (excluding unsupported)
+## all_with_unsupported : Build all targets (including unsupported)
 all_with_unsupported: $(VALID_TARGETS)
 
 ## unsupported : Build unsupported targets
@@ -349,11 +358,11 @@ $(VALID_TARGETS):
 	$(MAKE) binary hex TARGET=$@ && \
 	echo "Building $@ succeeded."
 
-$(SKIP_TARGETS):
+$(NOBUILD_TARGETS):
 	$(MAKE) TARGET=$@
 
-CLEAN_TARGETS = $(addprefix clean_,$(VALID_TARGETS) $(SKIP_TARGETS) )
-TARGETS_CLEAN = $(addsuffix _clean,$(VALID_TARGETS) $(SKIP_TARGETS) )
+CLEAN_TARGETS = $(addprefix clean_,$(VALID_TARGETS) )
+TARGETS_CLEAN = $(addsuffix _clean,$(VALID_TARGETS) )
 
 ## clean             : clean up temporary / machine-generated files
 clean:
@@ -461,10 +470,74 @@ targets:
 	@echo "targets-group-4:     $(GROUP_4_TARGETS)"
 	@echo "targets-group-rest:  $(GROUP_OTHER_TARGETS)"
 
+	@echo "targets-group-1:     $(words $(GROUP_1_TARGETS)) targets"
+	@echo "targets-group-2:     $(words $(GROUP_2_TARGETS)) targets"
+	@echo "targets-group-3:     $(words $(GROUP_3_TARGETS)) targets"
+	@echo "targets-group-4:     $(words $(GROUP_4_TARGETS)) targets"
+	@echo "targets-group-rest:  $(words $(GROUP_OTHER_TARGETS)) targets"
+	@echo "total in all groups  $(words $(SUPPORTED_TARGETS)) targets"
+
+## target-mcu        : print the MCU type of the target
+target-mcu:
+	@echo $(TARGET_MCU)
+
+## targets-by-mcu    : make all targets that have a MCU_TYPE mcu
+targets-by-mcu:
+	@echo "Building all $(MCU_TYPE) targets..."
+	$(V1) for target in $(VALID_TARGETS); do \
+		TARGET_MCU_TYPE=$$($(MAKE) -s TARGET=$${target} target-mcu); \
+		if [ "$${TARGET_MCU_TYPE}" = "$${MCU_TYPE}" ]; then \
+			echo "Building target $${target}..."; \
+			$(MAKE) TARGET=$${target}; \
+			if [ $$? -ne 0 ]; then \
+				echo "Building target $${target} failed, aborting."; \
+				exit 1; \
+			fi; \
+		fi; \
+	done
+
+## targets-f3        : make all F3 targets
+targets-f3:
+	$(V1) $(MAKE) -s targets-by-mcu MCU_TYPE=STM32F3
+
+## targets-f4        : make all F4 targets
+targets-f4:
+	$(V1) $(MAKE) -s targets-by-mcu MCU_TYPE=STM32F4
+
+## targets-f7        : make all F7 targets
+targets-f7:
+	$(V1) $(MAKE) -s targets-by-mcu MCU_TYPE=STM32F7
+
 ## test              : run the cleanflight test suite
 ## junittest         : run the cleanflight test suite, producing Junit XML result files.
 test junittest:
 	$(V0) cd src/test && $(MAKE) $@
+
+
+check-target-independence:
+	$(V1) for test_target in $(VALID_TARGETS); do \
+		FOUND=$$(grep -rE "\W$${test_target}\W?" src/main | grep -vE "(//)|(/\*).*\W$${test_target}\W?" | grep -vE "^src/main/target"); \
+		if [ "$${FOUND}" != "" ]; then \
+			echo "Target dependencies found:"; \
+			echo "$${FOUND}"; \
+			exit 1; \
+		fi; \
+	done
+
+check-fastram-usage-correctness:
+	$(V1) NON_TRIVIALLY_INITIALIZED=$$(grep -Ern "\W?FAST_RAM_ZERO_INIT\W.*=.*" src/main/ | grep -Ev "=\s*(false|NULL|0(\.0*f?)?)\s*[,;]"); \
+	if [ "$${NON_TRIVIALLY_INITIALIZED}" != "" ]; then \
+		echo "Non-trivially initialized FAST_RAM_ZERO_INIT variables found, use FAST_RAM instead:"; \
+		echo "$${NON_TRIVIALLY_INITIALIZED}"; \
+		exit 1; \
+	fi; \
+	TRIVIALLY_INITIALIZED=$$(grep -Ern "\W?FAST_RAM\W.*;" src/main/ | grep -v "="); \
+	EXPLICITLY_TRIVIALLY_INITIALIZED=$$(grep -Ern "\W?FAST_RAM\W.*;" src/main/ | grep -E "=\s*(false|NULL|0(\.0*f?)?)\s*[,;]"); \
+	if [ "$${TRIVIALLY_INITIALIZED}$${EXPLICITLY_TRIVIALLY_INITIALIZED}" != "" ]; then \
+		echo "Trivially initialized FAST_RAM variables found, use FAST_RAM_ZERO_INIT instead to save FLASH:"; \
+		echo "$${TRIVIALLY_INITIALIZED}\n$${EXPLICITLY_TRIVIALLY_INITIALIZED}"; \
+		exit 1; \
+	fi;
 
 # rebuild everything when makefile changes
 $(TARGET_OBJS) : Makefile

@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <stdbool.h>
@@ -130,7 +133,7 @@ void adcInitDevice(ADC_TypeDef *adcdev, int channelCount)
 }
 
 #ifdef USE_ADC_INTERNAL
-void adcInitInternalInjected(void)
+void adcInitInternalInjected(const adcConfig_t *config)
 {
     ADC_TempSensorVrefintCmd(ENABLE);
     ADC_InjectedDiscModeCmd(ADC1, DISABLE);
@@ -138,9 +141,10 @@ void adcInitInternalInjected(void)
     ADC_InjectedChannelConfig(ADC1, ADC_Channel_Vrefint, 1, ADC_SampleTime_480Cycles);
     ADC_InjectedChannelConfig(ADC1, ADC_Channel_TempSensor, 2, ADC_SampleTime_480Cycles);
 
-    adcVREFINTCAL = *(uint16_t *)VREFINT_CAL_ADDR;
-    adcTSCAL1 = *(uint16_t *)TS_CAL1_ADDR;
-    adcTSCAL2 = *(uint16_t *)TS_CAL2_ADDR;
+    adcVREFINTCAL = config->vrefIntCalibration ? config->vrefIntCalibration : *(uint16_t *)VREFINT_CAL_ADDR;
+    adcTSCAL1 = config->tempSensorCalibration1 ? config->tempSensorCalibration1 : *(uint16_t *)TS_CAL1_ADDR;
+    adcTSCAL2 = config->tempSensorCalibration2 ? config->tempSensorCalibration2 : *(uint16_t *)TS_CAL2_ADDR;
+
     adcTSSlopeK = (110 - 30) * 1000 / (adcTSCAL2 - adcTSCAL1);
 }
 
@@ -208,8 +212,9 @@ void adcInit(const adcConfig_t *config)
     }
 
     ADCDevice device = ADC_CFG_TO_DEV(config->device);
-    if (device == ADCINVALID)
+    if (device == ADCINVALID) {
         return;
+    }
 
     adcDevice_t adc = adcHardware[device];
 
@@ -254,7 +259,7 @@ void adcInit(const adcConfig_t *config)
     }
 
     // Initialize for injected conversion
-    adcInitInternalInjected();
+    adcInitInternalInjected(config);
 
     if (!adcActive) {
         return;

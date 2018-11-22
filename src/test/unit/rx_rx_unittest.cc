@@ -23,6 +23,8 @@
 extern "C" {
     #include "platform.h"
 
+    #include "pg/rx.h"
+    #include "build/debug.h"
     #include "drivers/io.h"
     #include "rx/rx.h"
     #include "fc/rc_modes.h"
@@ -34,11 +36,10 @@ extern "C" {
     #include "io/beeper.h"
 
     boxBitmask_t rcModeActivationMask;
+    int16_t debug[DEBUG16_VALUE_COUNT];
+    uint8_t debugMode = 0;
 
-    void rxResetFlightChannelStatus(void);
-    bool rxHaveValidFlightChannels(void);
     bool isPulseValid(uint16_t pulseDuration);
-    void rxUpdateFlightChannelStatus(uint8_t channel, uint16_t pulseDuration);
 
     PG_RESET_TEMPLATE(featureConfig_t, featureConfig,
         .enabledFeatures = 0
@@ -57,7 +58,8 @@ typedef struct testData_s {
 
 static testData_t testData;
 
-TEST(RxTest, TestValidFlightChannelsLowArm)
+#if 0 //!! valid pulse handling has changed so these test now test removed functions
+TEST(RxTest, TestValidFlightChannels)
 {
     // given
     memset(&testData, 0, sizeof(testData));
@@ -189,7 +191,7 @@ TEST(RxTest, TestInvalidFlightChannels)
         EXPECT_FALSE(rxHaveValidFlightChannels());
     }
 }
-
+#endif
 
 // STUBS
 

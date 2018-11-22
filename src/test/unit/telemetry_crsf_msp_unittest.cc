@@ -37,6 +37,7 @@ extern "C" {
 
     #include "pg/pg.h"
     #include "pg/pg_ids.h"
+    #include "pg/rx.h"
 
     #include "drivers/nvic.h"
     #include "drivers/serial.h"
@@ -68,6 +69,7 @@ extern "C" {
     int sbufBytesRemaining(sbuf_t *buf);
     void initSharedMsp();
     uint16_t testBatteryVoltage = 0;
+
     int32_t testAmperage = 0;
     uint8_t mspTxData[64]; //max frame size
     sbuf_t mspTxDataBuf;
@@ -254,11 +256,14 @@ extern "C" {
     uint32_t micros(void) {return dummyTimeUs;}
     serialPort_t *openSerialPort(serialPortIdentifier_e, serialPortFunction_e, serialReceiveCallbackPtr, void *, uint32_t, portMode_e, portOptions_e) {return NULL;}
     serialPortConfig_t *findSerialPortConfig(serialPortFunction_e ) {return NULL;}
-    bool isBatteryVoltageAvailable(void) { return true; }
+    bool isBatteryVoltageConfigured(void) { return true; }
     uint16_t getBatteryVoltage(void) {
         return testBatteryVoltage;
     }
-    bool isAmperageAvailable(void) { return true; }
+    uint16_t getBatteryAverageCellVoltage(void) {
+        return 0;
+    }
+    bool isAmperageConfigured(void) { return true; }
     int32_t getAmperage(void) {
         return testAmperage;
     }
@@ -267,9 +272,13 @@ extern "C" {
         return 67;
     }
 
-    bool feature(uint32_t) {return false;}
+    int32_t getEstimatedAltitudeCm(void) {
+    	return 0;
+    }
 
-    bool isAirmodeActive(void) {return true;}
+    bool featureIsEnabled(uint32_t) {return false;}
+
+    bool airmodeIsEnabled(void) {return true;}
 
     mspResult_e mspFcProcessCommand(mspPacket_t *cmd, mspPacket_t *reply, mspPostProcessFnPtr *mspPostProcessFn) {
 
@@ -295,4 +304,9 @@ extern "C" {
     int32_t getMAhDrawn(void) {
       return testmAhDrawn;
     }
+
+    bool telemetryIsSensorEnabled(sensor_e) {
+        return true;
+    }
+
 }

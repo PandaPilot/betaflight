@@ -23,7 +23,7 @@
 #define USE_CMS
 #define CMS_MAX_DEVICE 4
 #define USE_FAKE_GYRO
-#define BEEPER
+#define USE_BEEPER
 #define USE_BLACKBOX
 #define USE_MAG
 #define USE_BARO
@@ -59,6 +59,7 @@
 #define USE_UART5
 #define USE_SOFTSERIAL1
 #define USE_SOFTSERIAL2
+#define USE_TASK_STATISTICS
 
 #define SERIAL_PORT_COUNT 8
 

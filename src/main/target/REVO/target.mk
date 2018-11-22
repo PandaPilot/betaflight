@@ -1,6 +1,6 @@
 F405_TARGETS   += $(TARGET)
 ifeq ($(TARGET), AIRBOTF4SD)
-FEATURES       = VCP SDCARD
+FEATURES       = VCP SDCARD_SPI
 else
 FEATURES       = VCP ONBOARDFLASH
 endif
@@ -12,4 +12,5 @@ TARGET_SRC = \
             drivers/barometer/barometer_ms5611.c \
             drivers/barometer/barometer_bmp085.c \
             drivers/barometer/barometer_bmp280.c \
-            drivers/compass/compass_hmc5883l.c
+            drivers/compass/compass_hmc5883l.c \
+            drivers/compass/compass_qmc5883l.c

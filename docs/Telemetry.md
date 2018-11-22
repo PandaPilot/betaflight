@@ -107,7 +107,10 @@ Use the latest Graupner firmware for your transmitter and receiver.
 
 Older HoTT transmitters required the EAM and GPS modules to be enabled in the telemetry menu of the transmitter. (e.g. on MX-20)
 
-Serial ports use two wires but HoTT uses a single wire so some electronics are required so that the signals don't get mixed up.  The TX and RX pins of
+You can connect HoTT-Telemetry in two ways:
+
+#### Old way: 
+Serial ports use two wires but HoTT uses a single wire so some electronics are required so that the signals don't get mixed up.  The TX  and RX pins of
 a serial port should be connected using a diode and a single wire to the `T` port on a HoTT receiver.
 
 Connect as follows:
@@ -122,6 +125,11 @@ The diode should be arranged to allow the data signals to flow the right way
 ```
 
 1N4148 diodes have been tested and work with the GR-24.
+ 
+When using the diode disable `tlm_halfduplex`, go to CLI and type `set tlm_halfduplex = OFF`, don't forget a `save` afterwards.
+
+#### New way:
+You can use a single connection, connect HoTT RX/TX only to serial TX, leave serial RX open and make sure `tlm_halfduplex` is ON.
 
 As noticed by Skrebber the GR-12 (and probably GR-16/24, too) are based on a PIC 24FJ64GA-002, which has 5V tolerant digital pins.
 
@@ -308,3 +316,47 @@ These receivers are reported to work with i-bus telemetry:
 
 
 Note that the FlySky/Turnigy FS-iA4B 4-Channel Receiver (http://www.flysky-cn.com/products_detail/productId=46.html) seems to work but has a bug that might lose the binding, DO NOT FLY the FS-iA4B!
+
+
+## Jeti EX Bus telemetry
+
+If telemetry is to be used, only the telemetry feature needs to be activated.
+The telemetry names will be transmitted for the first 5-10 seconds.
+
+The following values are available:
+
+| Name            | Unit|
+| --------------- | ----|
+| Voltage         | [V]|
+| Current         | [A]|
+| Altitude        | [m]|
+| Capacity        | [mAh]|
+| Power           | [W]|
+| Roll angle      | [°]|
+| Pitch angle     | [°]|
+| Heading         | [°]|
+| Vario           | [m/s]|
+| GPS Sats        | [1]|
+| GPS Long        | |
+| GPS Lat         | |
+| GPS Speed       | [m/s]|
+| GPS H-Distance  | [m]|
+| GPS H-Direction | [°]|
+| GPS Heading     | [°]|
+| GPS Altitude    | [m]|
+| G-Force X       | |
+| G-Force Y       | |
+| G-Force Z       | |
+
+The telemetry values that are transmitted depend on whether a suitable sensor is available.
+
+| Value                                       | Sensor |
+| ------------------------------------------- | ------ |
+| Voltage                                     | Voltage measurement|
+| Current                                     | Current measurement|
+| Capacity and Power                          | Voltage & Current Measurement|
+| Heading                                     | Magnetometer|
+| Altitude and Vario                          | Barometer|
+| Roll angle, pitch angle and G-Froce X, Y, Z | ACC|
+| GPS Sats, GPS...                            | GPS|
+

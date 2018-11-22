@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <stdbool.h>
@@ -29,7 +32,8 @@
 
 #include "fc/config.h"
 #include "fc/controlrate_profile.h"
-#include "fc/fc_rc.h"
+#include "fc/rc.h"
+#include "fc/rc_controls.h"
 
 controlRateConfig_t *currentControlRateProfile;
 
@@ -52,30 +56,34 @@ void pgResetFn_controlRateProfiles(controlRateConfig_t *controlRateConfig)
             .rcExpo[FD_YAW] = 0,
             .rates[FD_ROLL] = 70,
             .rates[FD_PITCH] = 70,
-            .rates[FD_YAW] = 70
+            .rates[FD_YAW] = 70,
+            .throttle_limit_type = THROTTLE_LIMIT_TYPE_OFF,
+            .throttle_limit_percent = 100,
+            .rate_limit[FD_ROLL] = CONTROL_RATE_CONFIG_RATE_LIMIT_MAX,
+            .rate_limit[FD_PITCH] = CONTROL_RATE_CONFIG_RATE_LIMIT_MAX,
+            .rate_limit[FD_YAW] = CONTROL_RATE_CONFIG_RATE_LIMIT_MAX,
+            .tpaMode = TPA_MODE_PD,
         );
     }
 }
 
-void setControlRateProfile(uint8_t controlRateProfileIndex)
+void loadControlRateProfile(void)
 {
-    if (controlRateProfileIndex < CONTROL_RATE_PROFILE_COUNT) {
-        systemConfigMutable()->activeRateProfile = controlRateProfileIndex;
-        currentControlRateProfile = controlRateProfilesMutable(controlRateProfileIndex);
-    }
+    currentControlRateProfile = controlRateProfilesMutable(systemConfig()->activeRateProfile);
 }
 
 void changeControlRateProfile(uint8_t controlRateProfileIndex)
 {
-    if (controlRateProfileIndex >= CONTROL_RATE_PROFILE_COUNT) {
-        controlRateProfileIndex = CONTROL_RATE_PROFILE_COUNT - 1;
+    if (controlRateProfileIndex < CONTROL_RATE_PROFILE_COUNT) {
+        systemConfigMutable()->activeRateProfile = controlRateProfileIndex;
     }
-    setControlRateProfile(controlRateProfileIndex);
+
+    loadControlRateProfile();
     initRcProcessing();
 }
 
 void copyControlRateProfile(const uint8_t dstControlRateProfileIndex, const uint8_t srcControlRateProfileIndex) {
-    if ((dstControlRateProfileIndex < CONTROL_RATE_PROFILE_COUNT-1 && srcControlRateProfileIndex < CONTROL_RATE_PROFILE_COUNT-1)
+    if ((dstControlRateProfileIndex < CONTROL_RATE_PROFILE_COUNT && srcControlRateProfileIndex < CONTROL_RATE_PROFILE_COUNT)
         && dstControlRateProfileIndex != srcControlRateProfileIndex
     ) {
         memcpy(controlRateProfilesMutable(dstControlRateProfileIndex), controlRateProfilesMutable(srcControlRateProfileIndex), sizeof(controlRateConfig_t));

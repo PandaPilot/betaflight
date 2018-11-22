@@ -1,23 +1,31 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
 #include "common/time.h"
+
+#define TASK_PERIOD_HZ(hz) (1000000 / (hz))
+#define TASK_PERIOD_MS(ms) ((ms) * 1000)
+#define TASK_PERIOD_US(us) (us)
+
 
 typedef enum {
     TASK_PRIORITY_IDLE = 0,     // Disables dynamic scheduling, task is executed only if no other task is active this cycle
@@ -50,6 +58,7 @@ typedef struct {
 typedef enum {
     /* Actual tasks */
     TASK_SYSTEM = 0,
+    TASK_MAIN,
     TASK_GYROPID,
     TASK_ACCEL,
     TASK_ATTITUDE,
@@ -59,7 +68,7 @@ typedef enum {
     TASK_BATTERY_VOLTAGE,
     TASK_BATTERY_CURRENT,
     TASK_BATTERY_ALERTS,
-#ifdef BEEPER
+#ifdef USE_BEEPER
     TASK_BEEPER,
 #endif
 #ifdef USE_GPS
@@ -74,7 +83,7 @@ typedef enum {
 #ifdef USE_RANGEFINDER
     TASK_RANGEFINDER,
 #endif
-#if defined(USE_BARO) || defined(USE_RANGEFINDER)
+#if defined(USE_BARO) || defined(USE_GPS)
     TASK_ALTITUDE,
 #endif
 #ifdef USE_DASHBOARD
@@ -94,9 +103,6 @@ typedef enum {
 #endif
 #ifdef USE_OSD
     TASK_OSD,
-#endif
-#ifdef USE_OSD_SLAVE
-    TASK_OSD_SLAVE,
 #endif
 #ifdef USE_BST
     TASK_BST_MASTER_PROCESS,
@@ -122,6 +128,10 @@ typedef enum {
     TASK_ADC_INTERNAL,
 #endif
 
+#ifdef USE_PINIOBOX
+    TASK_PINIOBOX,
+#endif
+
     /* Count of real tasks */
     TASK_COUNT,
 
@@ -132,8 +142,10 @@ typedef enum {
 
 typedef struct {
     // Configuration
+#if defined(USE_TASK_STATISTICS)
     const char * taskName;
     const char * subTaskName;
+#endif
     bool (*checkFunc)(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs);
     void (*taskFunc)(timeUs_t currentTimeUs);
     timeDelta_t desiredPeriod;      // target period of execution
@@ -146,7 +158,7 @@ typedef struct {
     timeUs_t lastExecutedAt;        // last time of invocation
     timeUs_t lastSignaledAt;        // time of invocation event for event-driven tasks
 
-#ifndef SKIP_TASK_STATISTICS
+#if defined(USE_TASK_STATISTICS)
     // Statistics
     timeUs_t movingSumExecutionTime;  // moving sum over 32 samples
     timeUs_t maxExecutionTime;
@@ -164,10 +176,11 @@ void setTaskEnabled(cfTaskId_e taskId, bool newEnabledState);
 timeDelta_t getTaskDeltaTime(cfTaskId_e taskId);
 void schedulerSetCalulateTaskStatistics(bool calculateTaskStatistics);
 void schedulerResetTaskStatistics(cfTaskId_e taskId);
+void schedulerResetTaskMaxExecutionTime(cfTaskId_e taskId);
 
 void schedulerInit(void);
 void scheduler(void);
-void taskSystem(timeUs_t currentTime);
+void taskSystemLoad(timeUs_t currentTime);
 
 #define LOAD_PERCENTAGE_ONE 100
 

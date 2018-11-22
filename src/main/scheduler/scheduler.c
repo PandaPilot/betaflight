@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #define SRC_MAIN_SCHEDULER_C_
@@ -42,21 +45,21 @@
 // 2 - time spent in scheduler
 // 3 - time spent executing check function
 
-static FAST_RAM cfTask_t *currentTask = NULL;
+static FAST_RAM_ZERO_INIT cfTask_t *currentTask = NULL;
 
-static FAST_RAM uint32_t totalWaitingTasks;
-static FAST_RAM uint32_t totalWaitingTasksSamples;
+static FAST_RAM_ZERO_INIT uint32_t totalWaitingTasks;
+static FAST_RAM_ZERO_INIT uint32_t totalWaitingTasksSamples;
 
-static FAST_RAM bool calculateTaskStatistics;
-FAST_RAM uint16_t averageSystemLoadPercent = 0;
+static FAST_RAM_ZERO_INIT bool calculateTaskStatistics;
+FAST_RAM_ZERO_INIT uint16_t averageSystemLoadPercent = 0;
 
 
-static FAST_RAM int taskQueuePos = 0;
-STATIC_UNIT_TESTED FAST_RAM int taskQueueSize = 0;
+static FAST_RAM_ZERO_INIT int taskQueuePos = 0;
+STATIC_UNIT_TESTED FAST_RAM_ZERO_INIT int taskQueueSize = 0;
 
 // No need for a linked list for the queue, since items are only inserted at startup
 
-STATIC_UNIT_TESTED FAST_RAM cfTask_t* taskQueueArray[TASK_COUNT + 1]; // extra item for NULL pointer at end of queue
+STATIC_UNIT_TESTED FAST_RAM_ZERO_INIT cfTask_t* taskQueueArray[TASK_COUNT + 1]; // extra item for NULL pointer at end of queue
 
 void queueClear(void)
 {
@@ -120,7 +123,7 @@ FAST_CODE cfTask_t *queueNext(void)
     return taskQueueArray[++taskQueuePos]; // guaranteed to be NULL at end of queue
 }
 
-void taskSystem(timeUs_t currentTimeUs)
+void taskSystemLoad(timeUs_t currentTimeUs)
 {
     UNUSED(currentTimeUs);
 
@@ -135,7 +138,7 @@ void taskSystem(timeUs_t currentTimeUs)
 #endif
 }
 
-#ifndef SKIP_TASK_STATISTICS
+#if defined(USE_TASK_STATISTICS)
 #define MOVING_SUM_COUNT 32
 timeUs_t checkFuncMaxExecutionTime;
 timeUs_t checkFuncTotalExecutionTime;
@@ -147,20 +150,22 @@ void getCheckFuncInfo(cfCheckFuncInfo_t *checkFuncInfo)
     checkFuncInfo->totalExecutionTime = checkFuncTotalExecutionTime;
     checkFuncInfo->averageExecutionTime = checkFuncMovingSumExecutionTime / MOVING_SUM_COUNT;
 }
+#endif
 
 void getTaskInfo(cfTaskId_e taskId, cfTaskInfo_t * taskInfo)
 {
-    taskInfo->taskName = cfTasks[taskId].taskName;
-    taskInfo->subTaskName = cfTasks[taskId].subTaskName;
     taskInfo->isEnabled = queueContains(&cfTasks[taskId]);
     taskInfo->desiredPeriod = cfTasks[taskId].desiredPeriod;
     taskInfo->staticPriority = cfTasks[taskId].staticPriority;
+#if defined(USE_TASK_STATISTICS)
+    taskInfo->taskName = cfTasks[taskId].taskName;
+    taskInfo->subTaskName = cfTasks[taskId].subTaskName;
     taskInfo->maxExecutionTime = cfTasks[taskId].maxExecutionTime;
     taskInfo->totalExecutionTime = cfTasks[taskId].totalExecutionTime;
     taskInfo->averageExecutionTime = cfTasks[taskId].movingSumExecutionTime / MOVING_SUM_COUNT;
     taskInfo->latestDeltaTime = cfTasks[taskId].taskLatestDeltaTime;
-}
 #endif
+}
 
 void rescheduleTask(cfTaskId_e taskId, uint32_t newPeriodMicros)
 {
@@ -203,9 +208,7 @@ void schedulerSetCalulateTaskStatistics(bool calculateTaskStatisticsToUse)
 
 void schedulerResetTaskStatistics(cfTaskId_e taskId)
 {
-#ifdef SKIP_TASK_STATISTICS
-    UNUSED(taskId);
-#else
+#if defined(USE_TASK_STATISTICS)
     if (taskId == TASK_SELF) {
         currentTask->movingSumExecutionTime = 0;
         currentTask->totalExecutionTime = 0;
@@ -215,6 +218,21 @@ void schedulerResetTaskStatistics(cfTaskId_e taskId)
         cfTasks[taskId].totalExecutionTime = 0;
         cfTasks[taskId].maxExecutionTime = 0;
     }
+#else
+    UNUSED(taskId);
+#endif
+}
+
+void schedulerResetTaskMaxExecutionTime(cfTaskId_e taskId)
+{
+#if defined(USE_TASK_STATISTICS)
+    if (taskId == TASK_SELF) {
+        currentTask->maxExecutionTime = 0;
+    } else if (taskId < TASK_COUNT) {
+        cfTasks[taskId].maxExecutionTime = 0;
+    }
+#else
+    UNUSED(taskId);
 #endif
 }
 
@@ -263,7 +281,7 @@ FAST_CODE void scheduler(void)
 #if defined(SCHEDULER_DEBUG)
                 DEBUG_SET(DEBUG_SCHEDULER, 3, micros() - currentTimeBeforeCheckFuncCall);
 #endif
-#ifndef SKIP_TASK_STATISTICS
+#if defined(USE_TASK_STATISTICS)
                 if (calculateTaskStatistics) {
                     const uint32_t checkFuncExecutionTime = micros() - currentTimeBeforeCheckFuncCall;
                     checkFuncMovingSumExecutionTime += checkFuncExecutionTime - checkFuncMovingSumExecutionTime / MOVING_SUM_COUNT;
@@ -312,9 +330,7 @@ FAST_CODE void scheduler(void)
         selectedTask->dynamicPriority = 0;
 
         // Execute task
-#ifdef SKIP_TASK_STATISTICS
-        selectedTask->taskFunc(currentTimeUs);
-#else
+#if defined(USE_TASK_STATISTICS)
         if (calculateTaskStatistics) {
             const timeUs_t currentTimeBeforeTaskCall = micros();
             selectedTask->taskFunc(currentTimeBeforeTaskCall);
@@ -322,11 +338,12 @@ FAST_CODE void scheduler(void)
             selectedTask->movingSumExecutionTime += taskExecutionTime - selectedTask->movingSumExecutionTime / MOVING_SUM_COUNT;
             selectedTask->totalExecutionTime += taskExecutionTime;   // time consumed by scheduler + task
             selectedTask->maxExecutionTime = MAX(selectedTask->maxExecutionTime, taskExecutionTime);
-        } else {
+        } else
+#endif
+        {
             selectedTask->taskFunc(currentTimeUs);
         }
 
-#endif
 #if defined(SCHEDULER_DEBUG)
         DEBUG_SET(DEBUG_SCHEDULER, 2, micros() - currentTimeUs - taskExecutionTime); // time spent in scheduler
     } else {

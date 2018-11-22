@@ -458,8 +458,64 @@ static void SystemInit_ExtMemCtl(void);
 uint32_t SystemCoreClock;
 uint32_t pll_p = PLL_P, pll_n = PLL_N, pll_q = PLL_Q;
 
+typedef struct pllConfig_s {
+  uint16_t n;
+  uint16_t p;
+  uint16_t q;
+} pllConfig_t;
+
+static const pllConfig_t overclockLevels[] = {
+  { PLL_N, PLL_P, PLL_Q },    // default
+
+#if defined(STM32F40_41xxx)
+  { 384, 2, 8 },              // 192 MHz
+  { 432, 2, 9 },              // 216 MHz
+  { 480, 2, 10 }              // 240 MHz
+#elif defined(STM32F411xE)
+  { 432, 4, 9 },              // 108 MHz
+  { 480, 4, 10 },             // 120 MHz
+#endif
+
+  // XXX Doesn't work for F446 with this configuration.
+  // XXX Need to use smaller M to reduce N?
+};
+
+static PERSISTENT uint32_t currentOverclockLevel = 0;
+
+void SystemInitOC(void)
+{
+    /* PLL setting for overclocking */
+    if (currentOverclockLevel >= ARRAYLEN(overclockLevels)) {
+      return;
+    }
+
+    const pllConfig_t * const pll = overclockLevels + currentOverclockLevel;
+
+    pll_n = pll->n;
+    pll_p = pll->p;
+    pll_q = pll->q;
+}
+
+void OverclockRebootIfNecessary(uint32_t overclockLevel)
+{
+  if (overclockLevel >= ARRAYLEN(overclockLevels)) {
+    return;
+  }
+
+  const pllConfig_t * const pll = overclockLevels + overclockLevel;
+
+  // Reboot to adjust overclock frequency
+  if (SystemCoreClock != (pll->n / pll->p) * 1000000U) {
+    currentOverclockLevel = overclockLevel;
+    __disable_irq();
+    NVIC_SystemReset();
+  }
+}
+
 void SystemInit(void)
 {
+  SystemInitOC();
+
   /* core clock is simply a mhz of PLL_N / PLL_P */
   SystemCoreClock = (pll_n / pll_p) * 1000000;
 
@@ -500,21 +556,6 @@ void SystemInit(void)
 #else
   SCB->VTOR = FLASH_BASE | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal FLASH */
 #endif
-}
-
-void SystemInitOC(void)
-{
-#if !defined(STM32F446xxx)
-    // XXX Doesn't work for F446 with this configuration.
-    // XXX Need to use smaller M to reduce N?
-
-    /* PLL setting for overclocking */
-    pll_n = PLL_N_OC;
-    pll_p = PLL_P_OC;
-    pll_q = PLL_Q_OC;
-#endif
-
-    SystemInit();
 }
 
 /**

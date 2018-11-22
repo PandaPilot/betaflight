@@ -1,57 +1,78 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 #pragma once
 
-// Removed to make the firmware fit into flash:
-#undef USE_TELEMETRY_IBUS
-#undef USE_TELEMETRY_JETIEXBUS
-#undef USE_SERIALRX_JETIEXBUS
+#undef USE_DSHOT_DMAR           // OMNIBUS (F3) does not benefit from burst Dshot
+
+// Removed to make the firmware fit into flash (in descending order of priority):
+#undef USE_GYRO_OVERFLOW_CHECK
+#undef USE_GYRO_LPF2
+
+#undef USE_RC_SMOOTHING_FILTER
+#undef USE_DYN_LPF
+
+#undef USE_ITERM_RELAX
+#undef USE_RC_SMOOTHING_FILTER
+
+#undef USE_HUFFMAN
+#undef USE_PINIO
+#undef USE_PINIOBOX
+
+#undef USE_TELEMETRY_HOTT
 #undef USE_TELEMETRY_MAVLINK
 #undef USE_TELEMETRY_LTM
+#undef USE_SERIALRX_XBUS
+#undef USE_SERIALRX_SUMH
+#undef USE_PWM
 
+#undef USE_BOARD_INFO
+#undef USE_EXTENDED_CMS_MENUS
+#undef USE_RTC_TIME
+#undef USE_RX_MSP
+#undef USE_ESC_SENSOR_INFO
 
 #define TARGET_BOARD_IDENTIFIER "OMNI" // https://en.wikipedia.org/wiki/Omnibus
 
-#define CONFIG_FASTLOOP_PREFERRED_ACC ACC_NONE
-
-// Can be configured for DMAR, but keep it legacy DSHOT for backward compatibility of
-// Motor x 1 + Servo x 3 on PWM1~4 use case.
-#define USE_DSHOT_DMA
 
 #define LED0_PIN                PB3
 
-#define BEEPER                  PC15
+#define USE_BEEPER
+#define BEEPER_PIN              PC15
 #define BEEPER_INVERTED
 
 #define USE_EXTI
-#define MPU_INT_EXTI PC13
+#define USE_GYRO_EXTI
+#define GYRO_1_EXTI_PIN         PC13
 #define USE_MPU_DATA_READY_SIGNAL
 
-#define MPU6000_SPI_INSTANCE    SPI1
-#define MPU6000_CS_PIN          PA4
+#define GYRO_1_SPI_INSTANCE     SPI1
+#define GYRO_1_CS_PIN           PA4
 
 #define USE_GYRO
 #define USE_GYRO_SPI_MPU6000
-#define GYRO_MPU6000_ALIGN      CW90_DEG
+#define GYRO_1_ALIGN            CW90_DEG
 
 #define USE_ACC
 #define USE_ACC_SPI_MPU6000
-#define ACC_MPU6000_ALIGN       CW90_DEG
+#define ACC_1_ALIGN             CW90_DEG
 
 #define BMP280_SPI_INSTANCE     SPI1
 #define BMP280_CS_PIN           PA13
@@ -104,8 +125,6 @@
 
 // OSD define info:
 //   feature name (includes source) -> MAX_OSD, used in target.mk
-// include the osd code
-#define USE_OSD
 
 // include the max7456 driver
 #define USE_MAX7456
@@ -126,24 +145,15 @@
 #define SPI2_MOSI_PIN           PB15
 
 #define USE_SDCARD
-
+#define USE_SDCARD_SPI
 #define SDCARD_DETECT_INVERTED
 #define SDCARD_DETECT_PIN                   PC14
-
 #define SDCARD_SPI_INSTANCE                 SPI2
 #define SDCARD_SPI_CS_PIN                   SPI2_NSS_PIN
-
-// SPI2 is on the APB1 bus whose clock runs at 36MHz. Divide to under 400kHz for init:
-#define SDCARD_SPI_INITIALIZATION_CLOCK_DIVIDER 128
-// Divide to under 25MHz for normal operation:
-#define SDCARD_SPI_FULL_SPEED_CLOCK_DIVIDER     2
-
-#define USE_ESC_SENSOR
-
 // DSHOT output 4 uses DMA1_Channel5, so don't use it for the SDCARD until we find an alternative
+
 #ifndef USE_DSHOT
 #define SDCARD_DMA_CHANNEL_TX               DMA1_Channel5
-#define SDCARD_DMA_CHANNEL_TX_COMPLETE_FLAG DMA1_FLAG_TC5
 #endif
 
 // Performance logging for SD card operations:
@@ -167,9 +177,10 @@
 #define DEFAULT_RX_FEATURE      FEATURE_RX_PPM
 #define DEFAULT_FEATURES        (FEATURE_OSD)
 
-#define USE_BUTTONS
-#define BUTTON_A_PIN            PB1
-#define BUTTON_B_PIN            PB0
+// Disable rarely used buttons in favor of flash space
+//#define USE_BUTTONS
+//#define BUTTON_A_PIN            PB1
+//#define BUTTON_B_PIN            PB0
 
 //#define AVOID_UART3_FOR_PWM_PPM // Disable this for using UART3
 

@@ -1,18 +1,21 @@
 /*
- * This file is part of Cleanflight.
+ * This file is part of Cleanflight and Betaflight.
  *
- * Cleanflight is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * Cleanflight and Betaflight are free software. You can redistribute
+ * this software and/or modify this software under the terms of the
+ * GNU General Public License as published by the Free Software
+ * Foundation, either version 3 of the License, or (at your option)
+ * any later version.
  *
- * Cleanflight is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * Cleanflight and Betaflight are distributed in the hope that they
+ * will be useful, but WITHOUT ANY WARRANTY; without even the implied
+ * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with Cleanflight.  If not, see <http://www.gnu.org/licenses/>.
+ * along with this software.
+ *
+ * If not, see <http://www.gnu.org/licenses/>.
  */
 
 /* Created by jflyper */
@@ -26,34 +29,24 @@
 
 #if defined(USE_VTX_SMARTAUDIO) && defined(USE_VTX_CONTROL)
 
-#include "build/build_config.h"
 #include "build/debug.h"
 
 #include "cms/cms.h"
-#include "cms/cms_types.h"
 #include "cms/cms_menu_vtx_smartaudio.h"
 
 #include "common/maths.h"
 #include "common/printf.h"
 #include "common/utils.h"
 
-#include "pg/pg.h"
-#include "pg/pg_ids.h"
-
-#include "drivers/serial.h"
 #include "drivers/time.h"
 #include "drivers/vtx_common.h"
 
-#include "fc/rc_controls.h"
-#include "fc/runtime_config.h"
-
-#include "flight/pid.h"
-
 #include "io/serial.h"
-#include "io/vtx_control.h"
 #include "io/vtx.h"
+#include "io/vtx_control.h"
 #include "io/vtx_smartaudio.h"
 #include "io/vtx_string.h"
+
 
 // Timing parameters
 // Note that vtxSAProcess() is normally called at 200ms interval
@@ -61,12 +54,12 @@
 #define SMARTAUDIO_POLLING_INTERVAL  150    // Minimum time between state polling
 #define SMARTAUDIO_POLLING_WINDOW   1000    // Time window after command polling for state change
 
-//#define SMARTAUDIO_DPRINTF
-//#define SMARTAUDIO_DEBUG_MONITOR
+//#define USE_SMARTAUDIO_DPRINTF
+//#define DPRINTF_SERIAL_PORT SERIAL_PORT_USART1
 
-#ifdef SMARTAUDIO_DPRINTF
+#ifdef USE_SMARTAUDIO_DPRINTF
 serialPort_t *debugSerialPort = NULL;
-#endif // SMARTAUDIO_DPRINTF
+#endif // USE_SMARTAUDIO_DPRINTF
 
 static serialPort_t *smartAudioSerialPort = NULL;
 
@@ -187,7 +180,7 @@ static uint8_t CRC8(const uint8_t *data, const int8_t len)
 }
 
 
-#ifdef SMARTAUDIO_DPRINTF
+#ifdef USE_SMARTAUDIO_DPRINTF
 static void saPrintSettings(void)
 {
     dprintf(("Current status: version: %d\r\n", saDevice.version));
@@ -275,6 +268,12 @@ static void saProcessResponse(uint8_t *buf, int len)
 {
     uint8_t resp = buf[0];
 
+    if (IS_RC_MODE_ACTIVE(BOXVTXCONTROLDISABLE)) {
+        sa_outstanding = SA_CMD_NONE;
+
+        return;
+    }
+
     if (resp == sa_outstanding) {
         sa_outstanding = SA_CMD_NONE;
     } else if ((resp == SA_CMD_GET_SETTINGS_V2) && (sa_outstanding == SA_CMD_GET_SETTINGS)) {
@@ -297,12 +296,10 @@ static void saProcessResponse(uint8_t *buf, int len)
         saDevice.mode = buf[4];
         saDevice.freq = (buf[5] << 8)|buf[6];
 
-#ifdef SMARTAUDIO_DEBUG_MONITOR
-        debug[0] = saDevice.version * 100 + saDevice.mode;
-        debug[1] = saDevice.channel;
-        debug[2] = saDevice.freq;
-        debug[3] = saDevice.power;
-#endif
+        DEBUG_SET(DEBUG_SMARTAUDIO, 0, saDevice.version * 100 + saDevice.mode);
+        DEBUG_SET(DEBUG_SMARTAUDIO, 1, saDevice.channel);
+        DEBUG_SET(DEBUG_SMARTAUDIO, 2, saDevice.freq);
+        DEBUG_SET(DEBUG_SMARTAUDIO, 3, saDevice.power);
         break;
 
     case SA_CMD_SET_POWER: // Set Power
@@ -343,7 +340,7 @@ static void saProcessResponse(uint8_t *buf, int len)
 #ifdef USE_CMS    //if changes then trigger saCms update
         saCmsResetOpmodel();
 #endif
-#ifdef SMARTAUDIO_DPRINTF    // Debug
+#ifdef USE_SMARTAUDIO_DPRINTF    // Debug
         saPrintSettings();
 #endif
     }
@@ -364,7 +361,7 @@ static void saProcessResponse(uint8_t *buf, int len)
 // Datalink
 //
 
-static void saReceiveFramer(uint8_t c)
+static void saReceiveFrame(uint8_t c)
 {
 
     static enum saFramerState_e {
@@ -444,14 +441,26 @@ static void saReceiveFramer(uint8_t c)
 
 static void saSendFrame(uint8_t *buf, int len)
 {
-    serialWrite(smartAudioSerialPort, 0x00); // Generate 1st start bit
+    if (!IS_RC_MODE_ACTIVE(BOXVTXCONTROLDISABLE)) {
+        switch (smartAudioSerialPort->identifier) {
+            case SERIAL_PORT_SOFTSERIAL1:
+            case SERIAL_PORT_SOFTSERIAL2:
+                break;
+            default:
+                serialWrite(smartAudioSerialPort, 0x00); // Generate 1st start bit
+                break;
+        }
 
-    for (int i = 0 ; i < len ; i++) {
-        serialWrite(smartAudioSerialPort, buf[i]);
+        for (int i = 0 ; i < len ; i++) {
+            serialWrite(smartAudioSerialPort, buf[i]);
+        }
+
+        saStat.pktsent++;
+    } else {
+        sa_outstanding = SA_CMD_NONE;
     }
 
     sa_lastTransmissionMs = millis();
-    saStat.pktsent++;
 }
 
 /*
@@ -503,17 +512,6 @@ static saCmdQueue_t sa_queue[SA_QSIZE];
 static uint8_t sa_qhead = 0;
 static uint8_t sa_qtail = 0;
 
-#ifdef DPRINTF_SMARTAUDIO
-static int saQueueLength(void)
-{
-    if (sa_qhead >= sa_qtail) {
-        return sa_qhead - sa_qtail;
-    } else {
-        return SA_QSIZE + sa_qhead - sa_qtail;
-    }
-}
-#endif
-
 static bool saQueueEmpty(void)
 {
     return sa_qhead == sa_qtail;
@@ -538,7 +536,7 @@ static void saQueueCmd(uint8_t *buf, int len)
 static void saSendQueue(void)
 {
     if (saQueueEmpty()) {
-         return;
+        return;
     }
 
     saSendCmd(sa_queue[sa_qtail].buf, sa_queue[sa_qtail].len);
@@ -667,7 +665,7 @@ void saSetPowerByIndex(uint8_t index)
 
 bool vtxSmartAudioInit(void)
 {
-#ifdef SMARTAUDIO_DPRINTF
+#ifdef USE_SMARTAUDIO_DPRINTF
     // Setup debugSerialPort
 
     debugSerialPort = openSerialPort(DPRINTF_SERIAL_PORT, FUNCTION_NONE, NULL, NULL, 115200, MODE_RXTX, 0);
@@ -679,7 +677,7 @@ bool vtxSmartAudioInit(void)
 
     serialPortConfig_t *portConfig = findSerialPortConfig(FUNCTION_VTX_SMARTAUDIO);
     if (portConfig) {
-        portOptions_e portOptions = SERIAL_STOPBITS_2;
+        portOptions_e portOptions = SERIAL_STOPBITS_2 | SERIAL_BIDIR_NOPULL;
 #if defined(USE_VTX_COMMON)
         portOptions = portOptions | (vtxConfig()->halfDuplex ? SERIAL_BIDIR | SERIAL_BIDIR_PP : SERIAL_UNIDIR);
 #else
@@ -693,7 +691,7 @@ bool vtxSmartAudioInit(void)
         return false;
     }
 
-    vtxCommonRegisterDevice(&vtxSmartAudio);
+    vtxCommonSetDevice(&vtxSmartAudio);
 
     return true;
 }
@@ -703,8 +701,9 @@ bool vtxSmartAudioInit(void)
 #define SA_INITPHASE_WAIT_PITFREQ  2 // SA_FREQ_GETPIT sent and waiting for reply.
 #define SA_INITPHASE_DONE          3
 
-void vtxSAProcess(timeUs_t currentTimeUs)
+static void vtxSAProcess(vtxDevice_t *vtxDevice, timeUs_t currentTimeUs)
 {
+    UNUSED(vtxDevice);
     UNUSED(currentTimeUs);
 
     static char initPhase = SA_INITPHASE_START;
@@ -715,7 +714,7 @@ void vtxSAProcess(timeUs_t currentTimeUs)
 
     while (serialRxBytesWaiting(smartAudioSerialPort) > 0) {
         uint8_t c = serialRead(smartAudioSerialPort);
-        saReceiveFramer((uint16_t)c);
+        saReceiveFrame((uint16_t)c);
     }
 
     // Re-evaluate baudrate after each frame reception
@@ -777,25 +776,28 @@ void vtxSAProcess(timeUs_t currentTimeUs)
 #ifdef USE_VTX_COMMON
 // Interface to common VTX API
 
-vtxDevType_e vtxSAGetDeviceType(void)
+vtxDevType_e vtxSAGetDeviceType(const vtxDevice_t *vtxDevice)
 {
+    UNUSED(vtxDevice);
     return VTXDEV_SMARTAUDIO;
 }
 
-bool vtxSAIsReady(void)
+static bool vtxSAIsReady(const vtxDevice_t *vtxDevice)
 {
-    return !(saDevice.version == 0);
+    return vtxDevice!=NULL && !(saDevice.version == 0);
 }
 
-void vtxSASetBandAndChannel(uint8_t band, uint8_t channel)
+static void vtxSASetBandAndChannel(vtxDevice_t *vtxDevice, uint8_t band, uint8_t channel)
 {
+    UNUSED(vtxDevice);
     if (saValidateBandAndChannel(band, channel)) {
         saSetBandAndChannel(band - 1, channel - 1);
     }
 }
 
-void vtxSASetPowerByIndex(uint8_t index)
+static void vtxSASetPowerByIndex(vtxDevice_t *vtxDevice, uint8_t index)
 {
+    UNUSED(vtxDevice);
     if (index == 0) {
         // SmartAudio doesn't support power off.
         return;
@@ -804,9 +806,9 @@ void vtxSASetPowerByIndex(uint8_t index)
     saSetPowerByIndex(index - 1);
 }
 
-void vtxSASetPitMode(uint8_t onoff)
+static void vtxSASetPitMode(vtxDevice_t *vtxDevice, uint8_t onoff)
 {
-    if (!(vtxSAIsReady() && (saDevice.version == 2))) {
+    if (!(vtxSAIsReady(vtxDevice) && (saDevice.version == 2))) {
         return;
     }
 
@@ -830,17 +832,18 @@ void vtxSASetPitMode(uint8_t onoff)
     return;
 }
 
-void vtxSASetFreq(uint16_t freq)
+static void vtxSASetFreq(vtxDevice_t *vtxDevice, uint16_t freq)
 {
+    UNUSED(vtxDevice);
     if (saValidateFreq(freq)) {
         saSetMode(0);        //need to be in FREE mode to set freq
         saSetFreq(freq);
     }
 }
 
-bool vtxSAGetBandAndChannel(uint8_t *pBand, uint8_t *pChannel)
+static bool vtxSAGetBandAndChannel(const vtxDevice_t *vtxDevice, uint8_t *pBand, uint8_t *pChannel)
 {
-    if (!vtxSAIsReady()) {
+    if (!vtxSAIsReady(vtxDevice)) {
         return false;
     }
 
@@ -851,9 +854,9 @@ bool vtxSAGetBandAndChannel(uint8_t *pBand, uint8_t *pChannel)
     return true;
 }
 
-bool vtxSAGetPowerIndex(uint8_t *pIndex)
+static bool vtxSAGetPowerIndex(const vtxDevice_t *vtxDevice, uint8_t *pIndex)
 {
-    if (!vtxSAIsReady()) {
+    if (!vtxSAIsReady(vtxDevice)) {
         return false;
     }
 
@@ -861,9 +864,9 @@ bool vtxSAGetPowerIndex(uint8_t *pIndex)
     return true;
 }
 
-bool vtxSAGetPitMode(uint8_t *pOnOff)
+static bool vtxSAGetPitMode(const vtxDevice_t *vtxDevice, uint8_t *pOnOff)
 {
-    if (!(vtxSAIsReady() && (saDevice.version == 2))) {
+    if (!(vtxSAIsReady(vtxDevice) && (saDevice.version == 2))) {
         return false;
     }
 
@@ -871,9 +874,9 @@ bool vtxSAGetPitMode(uint8_t *pOnOff)
     return true;
 }
 
-bool vtxSAGetFreq(uint16_t *pFreq)
+static bool vtxSAGetFreq(const vtxDevice_t *vtxDevice, uint16_t *pFreq)
 {
-    if (!vtxSAIsReady()) {
+    if (!vtxSAIsReady(vtxDevice)) {
         return false;
     }
 
